@@ -333,6 +333,33 @@ group by productCode
 order by sum(quantityInStock * MSRP) desc;
 
 #11
+delimiter $$
+create function mpg_convert(v_mpg double) returns double
+deterministic no sql reads sql data
+begin
+declare v_lpk double;
+return 2.35215 * v_mpg;
+end $$
+delimiter ;
+
+#12
+delimiter $$
+create procedure increase_price(in increase_percentage double, in category varchar(255))
+begin
+update products
+set MSRP = (increase_percentage + 1)  * MSRP
+where productLine = category;
+end $$
+delimiter ;
+
+
+#13
+select o.orderNumber, sum(od.priceEach * od.orderLineNumber) as order_value
+from orders o 
+join orderdetails od on o.orderNumber = od.orderNumber
+where month(shippedDate) = 8 and year(shippedDate) =2004
+group by o.orderNumber;
+
 
 
 
