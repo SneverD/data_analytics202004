@@ -299,7 +299,6 @@ from orders;
 select c.customerName, avg(shippedDate - orderDate) as average_diff
 from customers c
 join orders o on c.customerNumber = o.customerNumber
-join orderdetails od on o.orderNumber = od.orderNumber
 group by c.customerNumber
 order by avg(datediff(shippedDate,orderDate)) desc;
 
@@ -360,6 +359,282 @@ join orderdetails od on o.orderNumber = od.orderNumber
 where month(shippedDate) = 8 and year(shippedDate) =2004
 group by o.orderNumber;
 
+#14
+select month(orderDate) as order_month, sum(od.quantityOrdered * od.priceEach)/ sum(p.amount) as ratio
+from payments p
+join orders o on p.customerNumber = o.customerNumber
+join orderdetails od on o.orderNumber = od.orderNumber
+group by order_month;
+
+#15
+SELECT 
+    tb1.payment_month,
+    tb1.monthly_payment AS 2004_payment,
+    tb2.monthly_payment AS 2003_payment,
+    tb1.monthly_payment - tb2.monthly_payment AS payment_difference
+FROM
+    (SELECT 
+        MONTH(paymentDate) AS payment_month,
+            SUM(amount) AS monthly_payment
+    FROM
+        payments
+    WHERE
+        YEAR(paymentDate) = 2004
+    GROUP BY MONTH(paymentDate)) AS tb1
+        JOIN
+    (SELECT 
+        MONTH(paymentDate) AS payment_month,
+            SUM(amount) AS monthly_payment
+    FROM
+        payments
+    WHERE
+        YEAR(paymentDate) = 2003
+    GROUP BY MONTH(paymentDate)) AS tb2 ON tb1.payment_month = tb2.payment_month
+ORDER BY payment_month ASC;
+
+#16
+delimiter $$
+create procedure amount_ordered(in v_month integer, in v_year integer, in v_name varchar(255))
+begin
+	select sum(od.quantityOrdered * od.priceEach)
+    from customers c
+    left join orders o on c.customerNumber = o.customerNumber
+    join orderdetails od on o.orderNumber = od.orderNumber
+    where month(o.orderDate) = v_month and year(o.orderDate) = v_year and c.customerName regexp v_name ;
+end $$
+delimiter ;
+
+#17
+delimiter $$
+create procedure change_credit_limit(in v_percentage double, in v_country varchar(255))
+begin
+update customers
+set creditLimit = (1 + v_percentage) * creditLimit
+where country = v_country;
+end$$
+delimiter ;
+
+#18
+#???????
+
+
+
+#19
+SELECT 
+    c.customerNumber,
+    c.customerName,
+    SUM(od.quantityOrdered * od.priceEach) AS revenue,
+    100 * SUM(od.quantityOrdered * od.priceEach) / (SELECT 
+            SUM(quantityOrdered * priceEach)
+        FROM
+            orderdetails) AS revenue_percentage
+FROM
+    customers c
+        LEFT JOIN
+    orders o ON c.customerNumber = o.customerNumber
+        JOIN
+    orderdetails od ON o.orderNumber = od.orderNumber
+GROUP BY c.customerNumber
+order by c.customerName;
+
+
+#20
+SELECT 
+    c.customerNumber,
+    c.customerName,
+    SUM(od.quantityOrdered * (od.priceEach - p.buyPrice)) AS profit,
+    100 * SUM(od.quantityOrdered * (od.priceEach - p.buyPrice)) / (SELECT 
+            SUM(quantityOrdered * (priceEach - buyPrice))
+        FROM
+            orderdetails od
+                JOIN
+            products p ON od.productCode = p.productCode) AS profit_percentage
+FROM
+    customers c
+        LEFT JOIN
+    orders o ON c.customerNumber = o.customerNumber
+        JOIN
+    orderdetails od ON o.orderNumber = od.orderNumber
+        JOIN
+    products p ON od.productCode = p.productCode
+GROUP BY c.customerNumber
+ORDER BY profit DESC;
+
+
+#21
+SELECT 
+    e.employeeNumber,
+    e.firstName,
+    e.lastName,
+    SUM(od.priceEach * od.quantityOrdered) AS revenue
+FROM
+    customers c
+        JOIN
+    employees e ON c.salesRepEmployeeNumber = e.employeeNumber
+        JOIN
+    orders o ON c.customerNumber = o.customerNumber
+        JOIN
+    orderdetails od ON o.orderNumber = od.orderNumber
+GROUP BY e.employeeNumber;
+
+
+#22
+select 
+	e.employeeNumber,
+    e.lastName,
+    e.firstName,
+    sum(quantityOrdered * (priceEach - buyPrice)) as profit
+from customers c
+left join employees e on c.salesRepEmployeeNumber = e.employeeNumber
+join orders o on c.customerNumber = o.customerNumber
+join orderdetails od on o.orderNumber = od.orderNumber
+join products p on od.productCode = p.productCode
+group by e.employeeNumber
+order by profit desc;
+
+
+#23
+select  
+	p.productName,
+    sum(quantityOrdered * priceEach) as revenue
+from products p 
+join orderdetails od on p.productCode = od.productCode
+group by p.productCode
+order by p.productName;
+
+
+#24
+select 
+	p.productLine,
+    sum(quantityOrdered * (priceEach - buyPrice)) as profit
+from products p
+join orderdetails od on p.productCode = od.productCode
+group by p.productLine
+order by profit desc;
+
+
+#25
+SELECT 
+    tb_2003.productCode,
+    tb_2003.productName,
+    revenue_2004 / revenue_2003 AS ratio
+FROM
+    (SELECT 
+        p.productCode,
+            p.productName,
+            SUM(od.priceEach * od.quantityOrdered) AS revenue_2003
+    FROM
+        products p
+    JOIN orderdetails od ON p.productCode = od.productCode
+    JOIN orders o ON od.orderNumber = o.orderNumber
+    WHERE
+        YEAR(o.orderDate) = 2003
+    GROUP BY p.productCode) AS tb_2003
+        LEFT JOIN
+    (SELECT 
+        p.productCode,
+            SUM(od.priceEach * od.quantityOrdered) AS revenue_2004
+    FROM
+        products p
+    JOIN orderdetails od ON p.productCode = od.productCode
+    JOIN orders o ON od.orderNumber = o.orderNumber
+    WHERE
+        YEAR(o.orderDate) = 2004
+    GROUP BY p.productCode) AS tb_2004 ON tb_2003.productCode = tb_2004.productCode
+GROUP BY productCode;
+
+
+#26
+SELECT 
+    tb_2003.customerNumber,
+    tb_2003.customerName,
+    tb_2003.payments AS payment_2003,
+    tb_2004.payments AS payment_2004,
+    tb_2004.payments / tb_2003.payments AS payments_ratio
+FROM
+    (SELECT 
+        c.customerNumber, c.customerName, SUM(p.amount) AS payments
+    FROM
+        customers c
+    JOIN payments p ON c.customerNumber = p.customerNumber
+    WHERE
+        YEAR(paymentDate) = 2003
+    GROUP BY c.customerNumber) AS tb_2003
+        LEFT JOIN
+    (SELECT 
+        c.customerNumber, SUM(p.amount) AS payments
+    FROM
+        customers c
+    JOIN payments p ON c.customerNumber = p.customerNumber
+    WHERE
+        YEAR(paymentDate) = 2004
+    GROUP BY c.customerNumber) AS tb_2004 ON tb_2003.customerNumber = tb_2004.customerNumber
+GROUP BY tb_2003.customerNumber;
+
+
+#27
+SELECT DISTINCT
+    p.productCode, p.productName
+FROM
+    products p
+        LEFT JOIN
+    orderdetails od ON p.productCode = od.productCode
+        JOIN
+    orders o ON od.orderNumber = o.orderNumber
+WHERE
+    p.productCode IN (SELECT DISTINCT
+            p.productCode
+        FROM
+            products p
+                JOIN
+            orderdetails od ON p.productCode = od.productCode
+                JOIN
+            orders o ON od.orderNumber = o.orderNumber
+        WHERE
+            YEAR(o.orderDate) = 2003)
+        AND p.productCode NOT IN (SELECT DISTINCT
+            p.productCode
+        FROM
+            products p
+                JOIN
+            orderdetails od ON p.productCode = od.productCode
+                JOIN
+            orders o ON od.orderNumber = o.orderNumber
+        WHERE
+            YEAR(o.orderDate) = 2004);
+            
+#28
+SELECT DISTINCT
+    p.customerNumber, c.customerName
+FROM
+    payments p
+        JOIN
+    customers c ON p.customerNumber = c.customerNumber
+WHERE
+    c.customerNumber NOT IN (SELECT DISTINCT
+            customerNumber
+        FROM
+            payments
+        WHERE
+            YEAR(paymentDate) = 2003);
+            
+
+
+#correlated subqueries
+#1
+SELECT DISTINCT
+    employeeNumber, lastName, firstName
+FROM
+    employees
+WHERE
+    reportsTo = (SELECT 
+            employeeNumber
+        FROM
+            employees
+        WHERE
+            lastName = 'Patterson'
+                AND firstName = 'Mary');
+                
 
 
 
@@ -367,6 +642,12 @@ group by o.orderNumber;
 
 
 
+
+
+
+
+#spatial data
+# no data available
 
 
 
