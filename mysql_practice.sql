@@ -634,6 +634,39 @@ WHERE
         WHERE
             lastName = 'Patterson'
                 AND firstName = 'Mary');
+
+
+#3
+select
+	productLine,
+	productCode,
+    productName,
+    round(100 * product_value / sum(product_value),2) as value_percentage
+from (
+	select 
+		productCode,
+        productName,
+        productLine,
+        buyPrice * quantityInStock as product_value
+    from products) tb1
+order by productLine, product_value DESC;
+                
+                
+#4
+select 
+	orderNumber,
+    productCode, 
+    product_value,
+    100 * (product_value/sum(product_value)) as percentage
+from (
+	select 
+		orderNumber, 
+        productCode,
+        quantityOrdered * priceEach as product_value
+    from orderdetails
+    ) tb1
+group by orderNumber
+HAVING count(productCode) >= 2 and product_value > 0.5 * sum(product_value);
                 
 
 
@@ -648,9 +681,6 @@ WHERE
 
 #spatial data
 # no data available
-
-
-
 
 
 
